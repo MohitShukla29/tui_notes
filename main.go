@@ -86,11 +86,29 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "ctrl+c", "q":
 			return m, tea.Quit
+		case "esc":
+			if m.createInputVisible {
+				m.createInputVisible = false
+			}
+			if m.currentFile != nil {
+				m.noteTextarea.SetValue("")
+				m.currentFile = nil
+			}
+			if m.showingList {
+				if m.list.FilterState() == list.Filtering {
+					break
+				}
+				m.showingList = false
+			}
+			return m, nil
 		case "ctrl+n":
 			m.createInputVisible = true
 			return m, nil
 		case "ctrl+l":
+			noteList := listFiles()
+			m.list.SetItems(noteList)
 			m.showingList = true
+
 			return m, nil
 		case "ctrl+s":
 			if m.currentFile == nil {
@@ -117,6 +135,28 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter":
 			if m.currentFile != nil {
 				break
+			}
+
+			if m.showingList {
+				item, ok := m.list.SelectedItem().(item)
+				if ok {
+					filepath := fmt.Sprintf("%s/%s", vaultDir, item.title)
+					content, err := os.ReadFile(filepath)
+					if err != nil {
+						log.Printf("Error reading file: %v", err)
+						return m, nil
+					}
+					m.noteTextarea.SetValue(string(content))
+					f, err := os.OpenFile(filepath, os.O_RDWR, 0644)
+					if err != nil {
+						log.Printf("Error reading file: %v", err)
+						return m, nil
+					}
+					m.currentFile = f
+					m.showingList = false
+
+				}
+				return m, nil
 			}
 			filename := m.textInput.Value()
 			filepath := fmt.Sprintf("%s/%s.md", vaultDir, filename)
